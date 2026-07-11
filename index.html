@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EarnIt - Creative Focus Tracker</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <style>
+        :root {
+            --bg-color: #121212;
+            --card-bg: #1e1e1e;
+            --accent-teal: #00a896;
+            --accent-orange: #f07167;
+            --text-main: #ffffff;
+            --text-muted: #a0a0a0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .app-container {
+            width: 100%;
+            max-width: 450px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .status-card {
+            background-color: var(--card-bg);
+            border-radius: 16px;
+            padding: 20px;
+            text-align: center;
+            border: 2px solid var(--accent-orange);
+            transition: all 0.3s ease;
+        }
+
+        .status-card.unlocked {
+            border-color: var(--accent-teal);
+        }
+
+        .timer-display {
+            font-size: 3rem;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+
+        .upload-section {
+            background-color: var(--card-bg);
+            border-radius: 16px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .camera-btn {
+            background-color: #2a2a2a;
+            border: 2px dashed #444;
+            color: var(--text-muted);
+            border-radius: 12px;
+            padding: 30px 20px;
+            text-align: center;
+            cursor: pointer;
+            font-weight: 500;
+        }
+
+        #camera-input { display: none; }
+
+        .preview-img {
+            width: 100%;
+            max-height: 250px;
+            object-fit: cover;
+            border-radius: 12px;
+            display: none;
+        }
+
+        textarea {
+            background-color: #2a2a2a;
+            border: 1px solid #444;
+            color: var(--text-main);
+            border-radius: 12px;
+            padding: 12px;
+            font-family: inherit;
+            resize: none;
+            height: 80px;
+        }
+
+        button.action-btn {
+            background-color: var(--accent-teal);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            padding: 14px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        button.action-btn:disabled {
+            background-color: #333;
+            color: #666;
+            cursor: not-allowed;
+        }
+
+        .archive-section {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .log-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+        }
+
+        .log-card {
+            background-color: var(--card-bg);
+            border-radius: 12px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .log-card img {
+            width: 100%;
+            height: 120px;
+            object-fit: cover;
+        }
+
+        .log-details {
+            padding: 10px;
+            font-size: 0.85rem;
+        }
+
+        .log-date {
+            color: var(--accent-teal);
+            font-size: 0.75rem;
+            margin-bottom: 4px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="app-container">
+    <div id="statusCard" class="status-card">
+        <h2 id="statusTitle">Distractions Locked</h2>
+        <div id="timerDisplay" class="timer-display">15:00</div>
+        <p id="statusMsg" style="color: var(--text-muted); margin: 0;">Submit an art proof to earn 15 minutes.</p>
+    </div>
+
+    <div id="uploadSection" class="upload-section">
+        <h3>Submit Studio Progress</h3>
+        <label for="camera-input" class="camera-btn" id="uploadLabel">
+            📷 Snap or Choose Photo
+        </label>
+        <input type="file" id="camera-input" accept="image/*" capture="environment">
+        <img id="preview" class="preview-img" alt="Progress preview">
+        <textarea id="description" placeholder="What are you working on right now?"></textarea>
+        <button id="submitBtn" class="action-btn" disabled>Submit Proof & Unlock</button>
+    </div>
+
+    <div class="archive-section">
+        <h3>On-Device Studio Archive</h3>
+        <div id="logGrid" class="log-grid"></div>
+    </div>
+</div>
+
+<script>
+    let timerInterval;
+    let unlockEndTime;
+    let currentImgBase64 = null;
+
+    const cameraInput = document.getElementById('camera-input');
+    const preview = document.getElementById('preview');
+    const uploadLabel = document.getElementById('uploadLabel');
+    const descriptionInput = document.getElementById('description');
+    const submitBtn = document.getElementById('submitBtn');
+    const statusCard = document.getElementById('statusCard');
+    const statusTitle = document.getElementById('statusTitle');
+    const timerDisplay = document.getElementById('timerDisplay');
+    const statusMsg = document.getElementById('statusMsg');
+    const logGrid = document.getElementById('logGrid');
+
+    cameraInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                currentImgBase64 = event.target.result;
+                preview.src = currentImgBase64;
+                preview.style.display = 'block';
+                uploadLabel.textContent = "🔄 Change Photo";
+                validateForm();
+            };
+            reader.readAsDataURL(file);
+        }
+    });
+
+    descriptionInput.addEventListener('input', validateForm);
+
+    function validateForm() {
+        submitBtn.disabled = !(currentImgBase64 && descriptionInput.value.trim().length > 0);
+    }
+
+    submitBtn.addEventListener('click', () => {
+        if (!currentImgBase64 || !descriptionInput.value.trim()) return;
+
+        const newLog = {
+            id: Date.now(),
+            date: new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
+            image: currentImgBase64,
+            description: descriptionInput.value.trim()
+        };
+
+        saveLogToLocalStorage(newLog);
+        startUnlockTimer();
+        resetForm();
+    });
+
+    function resetForm() {
+        currentImgBase64 = null;
+        preview.style.display = 'none';
+        preview.src = '';
+        uploadLabel.textContent = "📷 Snap or Choose Photo";
+        descriptionInput.value = '';
+        submitBtn.disabled = true;
+        cameraInput.value = '';
+    }
+
+    function startUnlockTimer() {
+        clearInterval(timerInterval);
+        statusCard.classList.add('unlocked');
+        statusTitle.textContent = "Distractions Unlocked";
+        statusMsg.textContent = "Enjoy your 15-minute break window.";
+        
+        unlockEndTime = Date.now() + (15 * 60 * 1000);
+        localStorage.setItem('unlockEndTime', unlockEndTime);
+
+        updateTimerUI();
+        timerInterval = setInterval(updateTimerUI, 1000);
+    }
+
+    function updateTimerUI() {
+        const remaining = unlockEndTime - Date.now();
+
+        if (remaining <= 0) {
+            clearInterval(timerInterval);
+            statusCard.classList.remove('unlocked');
+            statusTitle.textContent = "Distractions Locked";
+            timerDisplay.textContent = "15:00";
+            statusMsg.textContent = "Submit an art proof to earn 15 minutes.";
+            localStorage.removeItem('unlockEndTime');
+            return;
+        }
+
+        const minutes = Math.floor(remaining / 60000);
+        const seconds = Math.floor((remaining % 60000) / 1000);
+        timerDisplay.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    }
+
+    function saveLogToLocalStorage(log) {
+        let logs = JSON.parse(localStorage.getItem('studioLogs')) || [];
+        logs.unshift(log);
+        localStorage.setItem('studioLogs', JSON.stringify(logs));
+        renderLogs();
+    }
+
+    function renderLogs() {
+        let logs = JSON.parse(localStorage.getItem('studioLogs')) || [];
+        logGrid.innerHTML = '';
+        
+        logs.forEach(log => {
+            const card = document.createElement('div');
+            card.className = 'log-card';
+            card.innerHTML = `
+                
+                
+                    ${log.date}
+                    ${escapeHtml(log.description)}
+                
+            `;
+            logGrid.appendChild(card);
+        });
+    }
+
+    function escapeHtml(text) {
+        return text.replace(/&/g, "&").replace(/ {
+        renderLogs();
+        const savedEndTime = localStorage.getItem('unlockEndTime');
+        if (savedEndTime && parseInt(savedEndTime) > Date.now()) {
+            unlockEndTime = parseInt(savedEndTime);
+            statusCard.classList.add('unlocked');
+            statusTitle.textContent = "Distractions Unlocked";
+            updateTimerUI();
+            timerInterval = setInterval(updateTimerUI, 1000);
+        }
+    });
+
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('sw.js');
+    }
+</script>
+</body>
+</html>
+                        
