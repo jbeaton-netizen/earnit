@@ -196,13 +196,45 @@
     cameraInput.addEventListener('change', (e) => {
         const file = e.target.files[0];
         if (file) {
+            uploadLabel.textContent = "⚙️ Processing Image...";
             const reader = new FileReader();
             reader.onload = function(event) {
-                currentImgBase64 = event.target.result;
-                preview.src = currentImgBase64;
-                preview.style.display = 'block';
-                uploadLabel.textContent = "🔄 Change Photo";
-                validateForm();
+                const img = new Image();
+                img.onload = function() {
+                    // Create compression canvas
+                    const canvas = document.createElement('canvas');
+                    let width = img.width;
+                    let height = img.height;
+                    
+                    // Constrain dimensions to prevent massive data overhead
+                    const MAX_WIDTH = 800;
+                    const MAX_HEIGHT = 800;
+                    
+                    if (width > height) {
+                        if (width > MAX_WIDTH) {
+                            height *= MAX_WIDTH / width;
+                            width = MAX_WIDTH;
+                        }
+                    } else {
+                        if (height > MAX_HEIGHT) {
+                            width *= MAX_HEIGHT / height;
+                            height = MAX_HEIGHT;
+                        }
+                    }
+                    
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+                    
+                    // Convert to web-friendly JPEG with 0.7 compression factor
+                    currentImgBase64 = canvas.toDataURL('image/jpeg', 0.7);
+                    preview.src = currentImgBase64;
+                    preview.style.display = 'block';
+                    uploadLabel.textContent = "🔄 Change Photo";
+                    validateForm();
+                };
+                img.src = event.target.result;
             };
             reader.readAsDataURL(file);
         }
@@ -273,7 +305,13 @@
     function saveLogToLocalStorage(log) {
         let logs = JSON.parse(localStorage.getItem('studioLogs')) || [];
         logs.unshift(log);
-        localStorage.setItem('studioLogs', JSON.stringify(logs));
+        
+        // Wrap local saving in a try-catch to keep app working if storage fills up
+        try {
+            localStorage.setItem('studioLogs', JSON.stringify(logs));
+        } catch (e) {
+            console.error("Local storage allocation error:", e);
+        }
         renderLogs();
     }
 
@@ -296,7 +334,10 @@
     }
 
     function escapeHtml(text) {
-        return text.replace(/&/g, "&").replace(/ {
+        return text.replace(/&/g, "&").replace(//g, ">");
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
         renderLogs();
         const savedEndTime = localStorage.getItem('unlockEndTime');
         if (savedEndTime && parseInt(savedEndTime) > Date.now()) {
