@@ -90,6 +90,11 @@
             gap: 6px;
         }
 
+        /* Click Shield Fix: Prevents inner spans from blocking click propagation to label wrapper */
+        .action-select-btn * {
+            pointer-events: none;
+        }
+
         .action-select-btn:active {
             transform: scale(0.97);
             background-color: #1e293b;
@@ -213,18 +218,18 @@
         
         
         <div class="input-row">
-            <div id="cameraBtn" class="action-select-btn">
+            <label for="camera-input" id="cameraBtn" class="action-select-btn">
                 <span style="font-size: 1.5rem;">📷</span>
                 <span>Take Live Photo</span>
-            </div>
-            <div id="galleryBtn" class="action-select-btn">
+            </label>
+            <label for="gallery-input" id="galleryBtn" class="action-select-btn">
                 <span style="font-size: 1.5rem;">🖼️</span>
                 <span>Upload Gallery</span>
-            </div>
+            </label>
         </div>
 
-        <input type="file" id="camera-input" accept="image/*" capture="environment" style="display: none;">
-        <input type="file" id="gallery-input" accept="image/*" style="display: none;">
+        <input type="file" id="camera-input" accept="image/*" capture="environment" style="position: absolute; width: 0.1px; height: 0.1px; opacity: 0; overflow: hidden; z-index: -1;">
+        <input type="file" id="gallery-input" accept="image/*" style="position: absolute; width: 0.1px; height: 0.1px; opacity: 0; overflow: hidden; z-index: -1;">
         
         <img id="preview" class="preview-img" alt="Progress preview">
         <textarea id="description" placeholder="What are you working on right now?"></textarea>
@@ -263,15 +268,6 @@
         debugText.textContent = msg;
         console.error(msg);
     }
-
-    // Direct actions to bypass PWA labels bubbling bugs on iOS Safari
-    cameraBtn.addEventListener('click', () => {
-        cameraInput.click();
-    });
-
-    galleryBtn.addEventListener('click', () => {
-        galleryInput.click();
-    });
 
     // Auto-save description on type to survive potential low RAM background reloads
     descriptionInput.addEventListener('input', () => {
@@ -513,7 +509,7 @@
             preview.src = currentImgBase64;
             preview.style.display = 'block';
             cameraBtn.innerHTML = "<span>📷</span><span>Retake Photo</span>";
-            galleryBtn.innerHTML = "<span>🖼|</span><span>Change Photo</span>";
+            galleryBtn.innerHTML = "<span>🖼</span><span>Change Photo</span>";
         }
 
         renderLogs();
