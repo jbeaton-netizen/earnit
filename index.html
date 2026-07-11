@@ -1,17 +1,552 @@
-{
-  "name": "EarnIt Creative Focus",
-  "short_name": "EarnIt",
-  "start_url": "index.html",
-  "display": "standalone",
-  "background_color": "#0f172a",
-  "theme_color": "#0d9488",
-  "icons": [
-    {
-      "src": "https://placehold.co/512x512/0d9488/ffffff?text=E",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any maskable"
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EarnIt - Creative Focus Tracker</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --accent-teal: #0d9488;
+            --accent-orange: #f97316;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .app-container {
+            width: 100%;
+            max-width: 450px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .status-card {
+            background-color: var(--card-bg);
+            border-radius: 16px;
+            padding: 24px;
+            text-align: center;
+            border: 2px solid var(--accent-orange);
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+            transition: all 0.3s ease;
+        }
+
+        .status-card.unlocked {
+            border-color: var(--accent-teal);
+        }
+
+        .timer-display {
+            font-size: 3.5rem;
+            font-weight: 800;
+            margin: 12px 0;
+            letter-spacing: -0.05em;
+        }
+
+        .upload-section {
+            background-color: var(--card-bg);
+            border-radius: 16px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        /* Dual Input Buttons */
+        .input-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .action-select-btn {
+            background-color: #0f172a;
+            border: 1px solid #334155;
+            color: var(--text-main);
+            font-weight: 600;
+            border-radius: 12px;
+            padding: 16px 8px;
+            text-align: center;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.2s;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+        }
+
+        /* Click Shield Fix: Prevents inner spans from blocking click propagation to label wrapper */
+        .action-select-btn * {
+            pointer-events: none;
+        }
+
+        .action-select-btn:active {
+            transform: scale(0.97);
+            background-color: #1e293b;
+        }
+
+        /* Preview area */
+        .preview-img {
+            width: 100%;
+            max-height: 250px;
+            object-fit: cover;
+            border-radius: 12px;
+            display: none;
+            border: 1px solid #334155;
+        }
+
+        textarea {
+            background-color: #0f172a;
+            border: 1px solid #334155;
+            color: var(--text-main);
+            border-radius: 12px;
+            padding: 14px;
+            font-family: inherit;
+            resize: none;
+            height: 90px;
+            font-size: 0.95rem;
+        }
+
+        textarea:focus {
+            outline: none;
+            border-color: var(--accent-teal);
+        }
+
+        button.action-btn {
+            background-color: var(--accent-teal);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            padding: 16px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        button.action-btn:disabled {
+            background-color: #334155;
+            color: #64748b;
+            cursor: not-allowed;
+        }
+
+        .archive-section {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .log-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+        }
+
+        .log-card {
+            background-color: var(--card-bg);
+            border-radius: 12px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 2px 4px rgb(0 0 0 / 0.1);
+        }
+
+        .log-card img {
+            width: 100%;
+            height: 120px;
+            object-fit: cover;
+        }
+
+        .log-details {
+            padding: 10px;
+            font-size: 0.8rem;
+        }
+
+        .log-date {
+            color: var(--accent-teal);
+            font-weight: 600;
+            font-size: 0.75rem;
+            margin-bottom: 4px;
+        }
+
+        /* Diagnostic Panel */
+        .debug-panel {
+            background-color: #451a1a;
+            border: 1px solid #f87171;
+            color: #fecaca;
+            border-radius: 12px;
+            padding: 14px;
+            font-size: 0.8rem;
+            display: none;
+            flex-direction: column;
+            gap: 8px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="app-container">
+    <div id="debugPanel" class="debug-panel">
+        <strong>⚠️ App Diagnostic Log:</strong>
+        <div id="debugText" style="word-break: break-all; white-space: pre-wrap;"></div>
+        <button onclick="document.getElementById('debugPanel').style.display='none'" style="background: #ef4444; color: white; border: none; padding: 6px; border-radius: 6px; font-weight: bold; cursor: pointer;">Dismiss Log</button>
+    </div>
+
+    <div id="statusCard" class="status-card">
+        <h2 id="statusTitle">Distractions Locked</h2>
+        <div id="timerDisplay" class="timer-display">15:00</div>
+        <p id="statusMsg" style="color: var(--text-muted); margin: 0;">Submit an art proof to earn 15 minutes.</p>
+    </div>
+
+    <div id="uploadSection" class="upload-section">
+        <h3 style="font-size: 1.1rem; font-weight: 700;">Submit Studio Progress</h3>
+        
+        <!-- Dual trigger inputs (Using native labels for zero-JavaScript safety) -->
+        <div class="input-row">
+            <label for="camera-input" id="cameraBtn" class="action-select-btn">
+                <span style="font-size: 1.5rem;">📷</span>
+                <span>Take Live Photo</span>
+            </label>
+            <label for="gallery-input" id="galleryBtn" class="action-select-btn">
+                <span style="font-size: 1.5rem;">🖼️</span>
+                <span>Upload Gallery</span>
+            </label>
+        </div>
+
+        <input type="file" id="camera-input" accept="image/*" capture="environment" style="position: absolute; width: 0.1px; height: 0.1px; opacity: 0; overflow: hidden; z-index: -1;">
+        <input type="file" id="gallery-input" accept="image/*" style="position: absolute; width: 0.1px; height: 0.1px; opacity: 0; overflow: hidden; z-index: -1;">
+        
+        <img id="preview" class="preview-img" alt="Progress preview">
+        <textarea id="description" placeholder="What are you working on right now?"></textarea>
+        <button id="submitBtn" class="action-btn" disabled>Submit Proof & Unlock</button>
+    </div>
+
+    <div class="archive-section">
+        <h3 style="font-size: 1.1rem; font-weight: 700;">On-Device Studio Archive</h3>
+        <div id="logGrid" class="log-grid"></div>
+    </div>
+</div>
+
+<script>
+    let timerInterval;
+    let unlockEndTime;
+    let currentImgBase64 = null;
+
+    const cameraInput = document.getElementById('camera-input');
+    const galleryInput = document.getElementById('gallery-input');
+    const cameraBtn = document.getElementById('cameraBtn');
+    const galleryBtn = document.getElementById('galleryBtn');
+    
+    const preview = document.getElementById('preview');
+    const descriptionInput = document.getElementById('description');
+    const submitBtn = document.getElementById('submitBtn');
+    const statusCard = document.getElementById('statusCard');
+    const statusTitle = document.getElementById('statusTitle');
+    const timerDisplay = document.getElementById('timerDisplay');
+    const statusMsg = document.getElementById('statusMsg');
+    const logGrid = document.getElementById('logGrid');
+    const debugPanel = document.getElementById('debugPanel');
+    const debugText = document.getElementById('debugText');
+
+    // Bulletproof LocalStorage Safe Writer
+    function safeLocalStorageSet(key, value) {
+        try {
+            localStorage.setItem(key, value);
+            return true;
+        } catch (e) {
+            console.warn("Storage write blocked natively (Incognito/Quota Limit). Active operation remains memory-based.");
+            return false;
+        }
     }
-  ]
-}
+
+    function logError(msg) {
+        debugPanel.style.display = 'flex';
+        debugText.textContent = msg;
+        console.error(msg);
+    }
+
+    // Auto-save description on type to survive potential low RAM background reloads
+    descriptionInput.addEventListener('input', () => {
+        safeLocalStorageSet('temp_desc', descriptionInput.value);
+        validateForm();
+    });
+
+    cameraInput.addEventListener('change', handleImageSelection);
+    galleryInput.addEventListener('change', handleImageSelection);
+
+    // Highly Optimized Memory-Safe Blob & Canvas Compression Pipeline
+    function handleImageSelection(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        cameraBtn.innerHTML = "<span>⚙&#xFE0F;</span><span>Processing...</span>";
+        galleryBtn.innerHTML = "<span>⚙&#xFE0F;</span><span>Processing...</span>";
+
+        try {
+            // Memory-safe temporary Object URL (avoids high-res RAM crashing)
+            const objectUrl = URL.createObjectURL(file);
+            const img = new Image();
+            
+            img.onload = function() {
+                try {
+                    const canvas = document.createElement('canvas');
+                    let width = img.width;
+                    let height = img.height;
+                    const MAX_SIZE = 400; // Small, low-footprint scale guarantees zero-crash storage allocation
+                    
+                    if (width > height) {
+                        if (width > MAX_SIZE) {
+                            height *= MAX_SIZE / width;
+                            width = MAX_SIZE;
+                        }
+                    } else {
+                        if (height > MAX_SIZE) {
+                            width *= MAX_SIZE / height;
+                            height = MAX_SIZE;
+                        }
+                    }
+                    
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+                    
+                    // Low footprint base64 capture (usually under 25KB)
+                    currentImgBase64 = canvas.toDataURL('image/jpeg', 0.5);
+                    
+                    preview.src = currentImgBase64;
+                    preview.style.display = 'block';
+                    
+                    safeLocalStorageSet('temp_img', currentImgBase64);
+                    
+                    cameraBtn.innerHTML = "<span>📷</span><span>Retake Photo</span>";
+                    galleryBtn.innerHTML = "<span>🖼️</span><span>Change Photo</span>";
+                    validateForm();
+                    
+                    // Clean up URL memory instantly
+                    URL.revokeObjectURL(objectUrl);
+                } catch (canvasErr) {
+                    logError("Canvas layout generation error: " + canvasErr.message);
+                    fallbackToFileReader(file);
+                }
+            };
+
+            img.onerror = function() {
+                logError("Failed to decode system camera image package.");
+                fallbackToFileReader(file);
+            };
+
+            img.src = objectUrl;
+        } catch (err) {
+            logError("Object URI parsing blocked by OS security context. Redirecting fallback stream.");
+            fallbackToFileReader(file);
+        }
+    }
+
+    // Direct Stream reader fallback
+    function fallbackToFileReader(file) {
+        const reader = new FileReader();
+        reader.onload = function(event) {
+            currentImgBase64 = event.target.result;
+            preview.src = currentImgBase64;
+            preview.style.display = 'block';
+            safeLocalStorageSet('temp_img', currentImgBase64);
+            cameraBtn.innerHTML = "<span>📷</span><span>Retake Photo</span>";
+            galleryBtn.innerHTML = "<span>🖼️</span><span>Change Photo</span>";
+            validateForm();
+        };
+        reader.onerror = function() {
+            logError("Both memory-safe pipelines failed to decode this image.");
+        };
+        reader.readAsDataURL(file);
+    }
+
+    function validateForm() {
+        submitBtn.disabled = !(currentImgBase64 && descriptionInput.value.trim().length > 0);
+    }
+
+    submitBtn.addEventListener('click', () => {
+        try {
+            if (!currentImgBase64 || !descriptionInput.value.trim()) return;
+
+            const now = new Date();
+            const dateStr = now.toLocaleDateString() + ' ' + now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+            const newLog = {
+                id: Date.now(),
+                date: dateStr,
+                image: currentImgBase64,
+                description: descriptionInput.value.trim()
+            };
+
+            saveLogToLocalStorage(newLog);
+            startUnlockTimer();
+            resetForm();
+        } catch (submitErr) {
+            logError("Submit action triggered exception: " + submitErr.message);
+        }
+    });
+
+    function resetForm() {
+        currentImgBase64 = null;
+        preview.style.display = 'none';
+        preview.src = '';
+        cameraBtn.innerHTML = "<span>📷</span><span>Take Live Photo</span>";
+        galleryBtn.innerHTML = "<span>🖼️</span><span>Upload Gallery</span>";
+        descriptionInput.value = '';
+        submitBtn.disabled = true;
+        cameraInput.value = '';
+        galleryInput.value = '';
+        localStorage.removeItem('temp_desc');
+        localStorage.removeItem('temp_img');
+    }
+
+    function startUnlockTimer() {
+        clearInterval(timerInterval);
+        statusCard.classList.add('unlocked');
+        statusTitle.textContent = "Distractions Unlocked";
+        statusMsg.textContent = "Enjoy your 15-minute break window.";
+        
+        unlockEndTime = Date.now() + (15 * 60 * 1000);
+        safeLocalStorageSet('unlockEndTime', unlockEndTime);
+
+        updateTimerUI();
+        timerInterval = setInterval(updateTimerUI, 1000);
+    }
+
+    function updateTimerUI() {
+        const remaining = unlockEndTime - Date.now();
+
+        if (remaining <= 0) {
+            clearInterval(timerInterval);
+            statusCard.classList.remove('unlocked');
+            statusTitle.textContent = "Distractions Locked";
+            timerDisplay.textContent = "15:00";
+            statusMsg.textContent = "Submit an art proof to earn 15 minutes.";
+            localStorage.removeItem('unlockEndTime');
+            return;
+        }
+
+        const minutes = Math.floor(remaining / 60000);
+        const seconds = Math.floor((remaining % 60000) / 1000);
+        timerDisplay.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    }
+
+    function saveLogToLocalStorage(log) {
+        let logs = [];
+        try {
+            logs = JSON.parse(localStorage.getItem('studioLogs')) || [];
+        } catch (e) {
+            logs = [];
+        }
+        logs.unshift(log);
+        
+        // Strictly cap list to latest 10 elements to prevent hitting memory limitations
+        if (logs.length > 10) {
+            logs = logs.slice(0, 10);
+        }
+        
+        const success = safeLocalStorageSet('studioLogs', JSON.stringify(logs));
+        if (!success) {
+            // Try saving only the newest 3 items if storage limit remains tight
+            logs = logs.slice(0, 3);
+            safeLocalStorageSet('studioLogs', JSON.stringify(logs));
+        }
+        renderLogs(logs);
+    }
+
+    function renderLogs(logs) {
+        try {
+            if (!logs) {
+                logs = JSON.parse(localStorage.getItem('studioLogs')) || [];
+            }
+            logGrid.innerHTML = '';
+            
+            logs.forEach(log => {
+                const card = document.createElement('div');
+                card.className = 'log-card';
+                card.innerHTML = `
+                    
+                    
+                        ${log.date}
+                        ${escapeHtml(log.description)}
+                    
+                `;
+                logGrid.appendChild(card);
+            });
+        } catch (renderErr) {
+            logError("Archive render failed: " + renderErr.message);
+        }
+    }
+
+    function escapeHtml(text) {
+        return text.replace(/&/g, "&").replace(//g, ">");
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+        // Safe database repair block
+        try {
+            const rawLogs = localStorage.getItem('studioLogs');
+            if (rawLogs) {
+                const parsed = JSON.parse(rawLogs);
+                if (!Array.isArray(parsed)) throw new Error();
+            }
+        } catch (repairErr) {
+            localStorage.removeItem('studioLogs');
+            localStorage.removeItem('temp_img');
+            localStorage.removeItem('temp_desc');
+        }
+
+        // Restore description backups
+        const savedDesc = localStorage.getItem('temp_desc');
+        if (savedDesc) {
+            descriptionInput.value = savedDesc;
+        }
+
+        // Restore image backups
+        const savedImg = localStorage.getItem('temp_img');
+        if (savedImg) {
+            currentImgBase64 = savedImg;
+            preview.src = currentImgBase64;
+            preview.style.display = 'block';
+            cameraBtn.innerHTML = "<span>📷</span><span>Retake Photo</span>";
+            galleryBtn.innerHTML = "<span>🖼</span><span>Change Photo</span>";
+        }
+
+        renderLogs();
+        validateForm();
+        
+        const savedEndTime = localStorage.getItem('unlockEndTime');
+        if (savedEndTime && parseInt(savedEndTime) > Date.now()) {
+            unlockEndTime = parseInt(savedEndTime);
+            statusCard.classList.add('unlocked');
+            statusTitle.textContent = "Distractions Unlocked";
+            updateTimerUI();
+            timerInterval = setInterval(updateTimerUI, 1000);
+        }
+    });
+
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('sw.js').catch(function(err) {
+            console.log("Service Worker registration failed: ", err);
+        });
+    }
+</script>
+</body>
+</html>
                         
