@@ -149,11 +149,30 @@
             font-size: 0.75rem;
             margin-bottom: 4px;
         }
+
+        /* Diagnostic Panel */
+        .debug-panel {
+            background-color: #311;
+            border: 1px solid #f66;
+            color: #fbb;
+            border-radius: 12px;
+            padding: 15px;
+            font-size: 0.85rem;
+            display: none;
+            flex-direction: column;
+            gap: 8px;
+        }
     </style>
 </head>
 <body>
 
 <div class="app-container">
+    <div id="debugPanel" class="debug-panel">
+        <strong>⚠️ App Diagnostic Log:</strong>
+        <div id="debugText"></div>
+        <button onclick="document.getElementById('debugPanel').style.display='none'" style="background: #522; color: white; border: none; padding: 4px; border-radius: 6px; cursor: pointer;">Dismiss Log</button>
+    </div>
+
     <div id="statusCard" class="status-card">
         <h2 id="statusTitle">Distractions Locked</h2>
         <div id="timerDisplay" class="timer-display">15:00</div>
@@ -192,73 +211,106 @@
     const timerDisplay = document.getElementById('timerDisplay');
     const statusMsg = document.getElementById('statusMsg');
     const logGrid = document.getElementById('logGrid');
+    const debugPanel = document.getElementById('debugPanel');
+    const debugText = document.getElementById('debugText');
+
+    function logError(msg) {
+        debugPanel.style.display = 'flex';
+        debugText.textContent = msg;
+        console.error(msg);
+    }
+
+    // Auto-save description as they type so they don't lose it if phone camera triggers a page refresh
+    descriptionInput.addEventListener('input', () => {
+        localStorage.setItem('temp_desc', descriptionInput.value);
+        validateForm();
+    });
 
     cameraInput.addEventListener('change', (e) => {
         const file = e.target.files[0];
         if (file) {
             uploadLabel.textContent = "⚙️ Processing Image...";
             const reader = new FileReader();
+            
             reader.onload = function(event) {
                 const img = new Image();
                 img.onload = function() {
-                    // Create compression canvas
-                    const canvas = document.createElement('canvas');
-                    let width = img.width;
-                    let height = img.height;
-                    
-                    // Constrain dimensions to prevent massive data overhead
-                    const MAX_WIDTH = 800;
-                    const MAX_HEIGHT = 800;
-                    
-                    if (width > height) {
-                        if (width > MAX_WIDTH) {
-                            height *= MAX_WIDTH / width;
-                            width = MAX_WIDTH;
+                    try {
+                        const canvas = document.createElement('canvas');
+                        let width = img.width;
+                        let height = img.height;
+                        
+                        const MAX_WIDTH = 800;
+                        const MAX_HEIGHT = 800;
+                        
+                        if (width > height) {
+                            if (width > MAX_WIDTH) {
+                                height *= MAX_WIDTH / width;
+                                width = MAX_WIDTH;
+                            }
+                        } else {
+                            if (height > MAX_HEIGHT) {
+                                width *= MAX_HEIGHT / height;
+                                height = MAX_HEIGHT;
+                            }
                         }
-                    } else {
-                        if (height > MAX_HEIGHT) {
-                            width *= MAX_HEIGHT / height;
-                            height = MAX_HEIGHT;
-                        }
+                        
+                        canvas.width = width;
+                        canvas.height = height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, width, height);
+                        
+                        currentImgBase64 = canvas.toDataURL('image/jpeg', 0.65);
+                        preview.src = currentImgBase64;
+                        preview.style.display = 'block';
+                        uploadLabel.textContent = "🔄 Change Photo";
+                        validateForm();
+                    } catch (canvasErr) {
+                        logError("Canvas compression failed, attempting raw upload fallback: " + canvasErr.message);
+                        currentImgBase64 = event.target.result;
+                        preview.src = currentImgBase64;
+                        preview.style.display = 'block';
+                        uploadLabel.textContent = "🔄 Change Photo";
+                        validateForm();
                     }
-                    
-                    canvas.width = width;
-                    canvas.height = height;
-                    const ctx = canvas.getContext('2d');
-                    ctx.drawImage(img, 0, 0, width, height);
-                    
-                    // Convert to web-friendly JPEG with 0.7 compression factor
-                    currentImgBase64 = canvas.toDataURL('image/jpeg', 0.7);
-                    preview.src = currentImgBase64;
-                    preview.style.display = 'block';
-                    uploadLabel.textContent = "🔄 Change Photo";
-                    validateForm();
+                };
+                img.onerror = function() {
+                    logError("Failed to convert file into loadable image object.");
+                    uploadLabel.textContent = "❌ Load Error";
                 };
                 img.src = event.target.result;
             };
+            
+            reader.onerror = function() {
+                logError("Failed to read the file captured by camera.");
+                uploadLabel.textContent = "❌ Load Error";
+            };
+            
             reader.readAsDataURL(file);
         }
     });
-
-    descriptionInput.addEventListener('input', validateForm);
 
     function validateForm() {
         submitBtn.disabled = !(currentImgBase64 && descriptionInput.value.trim().length > 0);
     }
 
     submitBtn.addEventListener('click', () => {
-        if (!currentImgBase64 || !descriptionInput.value.trim()) return;
+        try {
+            if (!currentImgBase64 || !descriptionInput.value.trim()) return;
 
-        const newLog = {
-            id: Date.now(),
-            date: new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
-            image: currentImgBase64,
-            description: descriptionInput.value.trim()
-        };
+            const newLog = {
+                id: Date.now(),
+                date: new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
+                image: currentImgBase64,
+                description: descriptionInput.value.trim()
+            };
 
-        saveLogToLocalStorage(newLog);
-        startUnlockTimer();
-        resetForm();
+            saveLogToLocalStorage(newLog);
+            startUnlockTimer();
+            resetForm();
+        } catch (submitErr) {
+            logError("Submit button error: " + submitErr.message);
+        }
     });
 
     function resetForm() {
@@ -269,6 +321,7 @@
         descriptionInput.value = '';
         submitBtn.disabled = true;
         cameraInput.value = '';
+        localStorage.removeItem('temp_desc');
     }
 
     function startUnlockTimer() {
@@ -306,31 +359,43 @@
         let logs = JSON.parse(localStorage.getItem('studioLogs')) || [];
         logs.unshift(log);
         
-        // Wrap local saving in a try-catch to keep app working if storage fills up
+        // Wrap saving in try-catch and pop oldest if memory is full
         try {
             localStorage.setItem('studioLogs', JSON.stringify(logs));
         } catch (e) {
-            console.error("Local storage allocation error:", e);
+            logError("Local storage warning: Reached quota limit. Removing oldest log entry to fit new proof.");
+            if (logs.length > 1) {
+                logs.pop(); // discard oldest
+                try {
+                    localStorage.setItem('studioLogs', JSON.stringify(logs));
+                } catch (retryErr) {
+                    logError("LocalStorage write failed completely: " + retryErr.message);
+                }
+            }
         }
         renderLogs();
     }
 
     function renderLogs() {
-        let logs = JSON.parse(localStorage.getItem('studioLogs')) || [];
-        logGrid.innerHTML = '';
-        
-        logs.forEach(log => {
-            const card = document.createElement('div');
-            card.className = 'log-card';
-            card.innerHTML = `
-                
-                
-                    ${log.date}
-                    ${escapeHtml(log.description)}
-                
-            `;
-            logGrid.appendChild(card);
-        });
+        try {
+            let logs = JSON.parse(localStorage.getItem('studioLogs')) || [];
+            logGrid.innerHTML = '';
+            
+            logs.forEach(log => {
+                const card = document.createElement('div');
+                card.className = 'log-card';
+                card.innerHTML = `
+                    
+                    
+                        ${log.date}
+                        ${escapeHtml(log.description)}
+                    
+                `;
+                logGrid.appendChild(card); // FIXED: appendChild instead of .add()
+            });
+        } catch (renderErr) {
+            logError("Render error: " + renderErr.message);
+        }
     }
 
     function escapeHtml(text) {
@@ -338,7 +403,14 @@
     }
 
     window.addEventListener('DOMContentLoaded', () => {
+        // Restore description in case page was reloaded by camera system usage
+        const savedDesc = localStorage.getItem('temp_desc');
+        if (savedDesc) {
+            descriptionInput.value = savedDesc;
+        }
+
         renderLogs();
+        
         const savedEndTime = localStorage.getItem('unlockEndTime');
         if (savedEndTime && parseInt(savedEndTime) > Date.now()) {
             unlockEndTime = parseInt(savedEndTime);
@@ -350,7 +422,9 @@
     });
 
     if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('sw.js');
+        navigator.serviceWorker.register('sw.js').catch(function(err) {
+            console.log("Service Worker registration failed: ", err);
+        });
     }
 </script>
 </body>
