@@ -9,12 +9,12 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <style>
         :root {
-            --bg-color: #121212;
-            --card-bg: #1e1e1e;
-            --accent-teal: #00a896;
-            --accent-orange: #f07167;
-            --text-main: #ffffff;
-            --text-muted: #a0a0a0;
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --accent-teal: #0d9488;
+            --accent-orange: #f97316;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
         }
 
         body {
@@ -22,7 +22,7 @@
             background-color: var(--bg-color);
             color: var(--text-main);
             margin: 0;
-            padding: 20px;
+            padding: 16px;
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -33,15 +33,16 @@
             max-width: 450px;
             display: flex;
             flex-direction: column;
-            gap: 20px;
+            gap: 16px;
         }
 
         .status-card {
             background-color: var(--card-bg);
             border-radius: 16px;
-            padding: 20px;
+            padding: 24px;
             text-align: center;
             border: 2px solid var(--accent-orange);
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
             transition: all 0.3s ease;
         }
 
@@ -50,9 +51,10 @@
         }
 
         .timer-display {
-            font-size: 3rem;
-            font-weight: bold;
-            margin: 10px 0;
+            font-size: 3.5rem;
+            font-weight: 800;
+            margin: 12px 0;
+            letter-spacing: -0.05em;
         }
 
         .upload-section {
@@ -61,39 +63,63 @@
             padding: 20px;
             display: flex;
             flex-direction: column;
-            gap: 15px;
+            gap: 12px;
         }
 
-        .camera-btn {
-            background-color: #2a2a2a;
-            border: 2px dashed #444;
-            color: var(--text-muted);
+        /* Dual Input Buttons */
+        .input-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .action-select-btn {
+            background-color: #0f172a;
+            border: 1px solid #334155;
+            color: var(--text-main);
+            font-weight: 600;
             border-radius: 12px;
-            padding: 30px 20px;
+            padding: 16px 8px;
             text-align: center;
             cursor: pointer;
-            font-weight: 500;
+            font-size: 0.9rem;
+            transition: all 0.2s;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
         }
 
-        #camera-input { display: none; }
+        .action-select-btn:active {
+            transform: scale(0.97);
+            background-color: #1e293b;
+        }
 
+        /* Preview area */
         .preview-img {
             width: 100%;
             max-height: 250px;
             object-fit: cover;
             border-radius: 12px;
             display: none;
+            border: 1px solid #334155;
         }
 
         textarea {
-            background-color: #2a2a2a;
-            border: 1px solid #444;
+            background-color: #0f172a;
+            border: 1px solid #334155;
             color: var(--text-main);
             border-radius: 12px;
-            padding: 12px;
+            padding: 14px;
             font-family: inherit;
             resize: none;
-            height: 80px;
+            height: 90px;
+            font-size: 0.95rem;
+        }
+
+        textarea:focus {
+            outline: none;
+            border-color: var(--accent-teal);
         }
 
         button.action-btn {
@@ -101,22 +127,23 @@
             color: white;
             border: none;
             border-radius: 12px;
-            padding: 14px;
+            padding: 16px;
             font-size: 1rem;
             font-weight: bold;
             cursor: pointer;
+            transition: all 0.2s;
         }
 
         button.action-btn:disabled {
-            background-color: #333;
-            color: #666;
+            background-color: #334155;
+            color: #64748b;
             cursor: not-allowed;
         }
 
         .archive-section {
             display: flex;
             flex-direction: column;
-            gap: 15px;
+            gap: 12px;
         }
 
         .log-grid {
@@ -131,6 +158,7 @@
             overflow: hidden;
             display: flex;
             flex-direction: column;
+            box-shadow: 0 2px 4px rgb(0 0 0 / 0.1);
         }
 
         .log-card img {
@@ -141,23 +169,24 @@
 
         .log-details {
             padding: 10px;
-            font-size: 0.85rem;
+            font-size: 0.8rem;
         }
 
         .log-date {
             color: var(--accent-teal);
+            font-weight: 600;
             font-size: 0.75rem;
             margin-bottom: 4px;
         }
 
         /* Diagnostic Panel */
         .debug-panel {
-            background-color: #311;
-            border: 1px solid #f66;
-            color: #fbb;
+            background-color: #451a1a;
+            border: 1px solid #f87171;
+            color: #fecaca;
             border-radius: 12px;
-            padding: 15px;
-            font-size: 0.85rem;
+            padding: 14px;
+            font-size: 0.8rem;
             display: none;
             flex-direction: column;
             gap: 8px;
@@ -169,8 +198,8 @@
 <div class="app-container">
     <div id="debugPanel" class="debug-panel">
         <strong>⚠️ App Diagnostic Log:</strong>
-        <div id="debugText"></div>
-        <button onclick="document.getElementById('debugPanel').style.display='none'" style="background: #522; color: white; border: none; padding: 4px; border-radius: 6px; cursor: pointer;">Dismiss Log</button>
+        <div id="debugText" style="word-break: break-all; white-space: pre-wrap;"></div>
+        <button onclick="document.getElementById('debugPanel').style.display='none'" style="background: #ef4444; color: white; border: none; padding: 6px; border-radius: 6px; font-weight: bold; cursor: pointer;">Dismiss Log</button>
     </div>
 
     <div id="statusCard" class="status-card">
@@ -180,18 +209,30 @@
     </div>
 
     <div id="uploadSection" class="upload-section">
-        <h3>Submit Studio Progress</h3>
-        <label for="camera-input" class="camera-btn" id="uploadLabel">
-            📷 Snap or Choose Photo
-        </label>
-        <input type="file" id="camera-input" name="camera-input" accept="image/*">
+        <h3 style="font-size: 1.1rem; font-weight: 700;">Submit Studio Progress</h3>
+        
+        
+        <div class="input-row">
+            <div id="cameraBtn" class="action-select-btn">
+                <span style="font-size: 1.5rem;">📷</span>
+                <span>Take Live Photo</span>
+            </div>
+            <div id="galleryBtn" class="action-select-btn">
+                <span style="font-size: 1.5rem;">🖼️</span>
+                <span>Upload Gallery</span>
+            </div>
+        </div>
+
+        <input type="file" id="camera-input" accept="image/*" capture="environment" style="display: none;">
+        <input type="file" id="gallery-input" accept="image/*" style="display: none;">
+        
         <img id="preview" class="preview-img" alt="Progress preview">
         <textarea id="description" placeholder="What are you working on right now?"></textarea>
         <button id="submitBtn" class="action-btn" disabled>Submit Proof & Unlock</button>
     </div>
 
     <div class="archive-section">
-        <h3>On-Device Studio Archive</h3>
+        <h3 style="font-size: 1.1rem; font-weight: 700;">On-Device Studio Archive</h3>
         <div id="logGrid" class="log-grid"></div>
     </div>
 </div>
@@ -202,8 +243,11 @@
     let currentImgBase64 = null;
 
     const cameraInput = document.getElementById('camera-input');
+    const galleryInput = document.getElementById('gallery-input');
+    const cameraBtn = document.getElementById('cameraBtn');
+    const galleryBtn = document.getElementById('galleryBtn');
+    
     const preview = document.getElementById('preview');
-    const uploadLabel = document.getElementById('uploadLabel');
     const descriptionInput = document.getElementById('description');
     const submitBtn = document.getElementById('submitBtn');
     const statusCard = document.getElementById('statusCard');
@@ -220,107 +264,108 @@
         console.error(msg);
     }
 
-    // Direct listener to prevent stand-alone PWA label-to-input click bubble failures on iOS
-    uploadLabel.addEventListener('click', (e) => {
-        e.preventDefault();
+    // Direct actions to bypass PWA labels bubbling bugs on iOS Safari
+    cameraBtn.addEventListener('click', () => {
         cameraInput.click();
     });
 
-    // Auto-save description as they type so they don't lose it if phone camera triggers a page refresh
+    galleryBtn.addEventListener('click', () => {
+        galleryInput.click();
+    });
+
+    // Auto-save description on type to survive potential low RAM background reloads
     descriptionInput.addEventListener('input', () => {
         localStorage.setItem('temp_desc', descriptionInput.value);
         validateForm();
     });
 
-    cameraInput.addEventListener('change', (e) => {
+    cameraInput.addEventListener('change', handleImageSelection);
+    galleryInput.addEventListener('change', handleImageSelection);
+
+    function handleImageSelection(e) {
         const file = e.target.files[0];
         if (file) {
-            uploadLabel.textContent = "⚙&#xFE0F; Processing Image...";
+            cameraBtn.innerHTML = "<span>⚙&#xFE0F;</span><span>Processing...</span>";
+            galleryBtn.innerHTML = "<span>⚙&#xFE0F;</span><span>Processing...</span>";
             
-            // iOS Crash Protection: Use lightweight Object URLs instead of heavy Base64 parsing on camera returns
-            let blobUrl;
-            try {
-                blobUrl = URL.createObjectURL(file);
-            } catch (blobErr) {
-                logError("Object URL initialization failed, attempting fallback file reader.");
-                fallbackRead(file);
-                return;
-            }
-
-            const img = new Image();
-            img.onload = function() {
-                try {
-                    const canvas = document.createElement('canvas');
-                    let width = img.width;
-                    let height = img.height;
-                    
-                    const MAX_WIDTH = 500; 
-                    const MAX_HEIGHT = 500;
-                    
-                    if (width > height) {
-                        if (width > MAX_WIDTH) {
-                            height *= MAX_WIDTH / width;
-                            width = MAX_WIDTH;
-                        }
-                    } else {
-                        if (height > MAX_HEIGHT) {
-                            width *= MAX_HEIGHT / height;
-                            height = MAX_HEIGHT;
-                        }
-                    }
-                    
-                    canvas.width = width;
-                    canvas.height = height;
-                    const ctx = canvas.getContext('2d');
-                    ctx.drawImage(img, 0, 0, width, height);
-                    
-                    currentImgBase64 = canvas.toDataURL('image/jpeg', 0.50); // High-density compression
-                    URL.revokeObjectURL(blobUrl); // Instantly free browser cache RAM
-
-                    // Save preview to local cache so memory reloads recover gracefully
+            // Progressive File Reader prevents sandbox breaks by reading raw stream first
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                const rawDataUrl = event.target.result;
+                
+                // Compress via off-screen Canvas
+                const img = new Image();
+                img.onload = function() {
                     try {
-                        localStorage.setItem('temp_img', currentImgBase64);
-                    } catch (quotaErr) {
-                        console.warn("Storage quota exceeded, deleting oldest log to free space.");
-                        let tempLogs = JSON.parse(localStorage.getItem('studioLogs')) || [];
-                        if (tempLogs.length > 0) {
-                            tempLogs.pop();
-                            localStorage.setItem('studioLogs', JSON.stringify(tempLogs));
+                        const canvas = document.createElement('canvas');
+                        let width = img.width;
+                        let height = img.height;
+                        const MAX_WIDTH = 500; 
+                        const MAX_HEIGHT = 500;
+                        
+                        if (width > height) {
+                            if (width > MAX_WIDTH) {
+                                height *= MAX_WIDTH / width;
+                                width = MAX_WIDTH;
+                            }
+                        } else {
+                            if (height > MAX_HEIGHT) {
+                                width *= MAX_HEIGHT / height;
+                                height = MAX_HEIGHT;
+                            }
                         }
-                        localStorage.setItem('temp_img', currentImgBase64);
+                        
+                        canvas.width = width;
+                        canvas.height = height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, width, height);
+                        
+                        currentImgBase64 = canvas.toDataURL('image/jpeg', 0.55); // High density compression
+                        
+                        // Save backup immediately to bypass low RAM reboots
+                        try {
+                            localStorage.setItem('temp_img', currentImgBase64);
+                        } catch (quotaErr) {
+                            console.warn("Cleared old log due to local storage quota bounds.");
+                            let tempLogs = JSON.parse(localStorage.getItem('studioLogs')) || [];
+                            if (tempLogs.length > 0) {
+                                tempLogs.pop();
+                                localStorage.setItem('studioLogs', JSON.stringify(tempLogs));
+                            }
+                            localStorage.setItem('temp_img', currentImgBase64);
+                        }
+
+                        preview.src = currentImgBase64;
+                        preview.style.display = 'block';
+                        
+                        cameraBtn.innerHTML = "<span>📷</span><span>Retake Photo</span>";
+                        galleryBtn.innerHTML = "<span>🖼️</span><span>Change Photo</span>";
+                        validateForm();
+                    } catch (canvasErr) {
+                        logError("Canvas compression fell back to legacy layout: " + canvasErr.message);
+                        legacyFallback(rawDataUrl);
                     }
-
-                    preview.src = currentImgBase64;
-                    preview.style.display = 'block';
-                    uploadLabel.textContent = "🔄 Change Photo";
-                    validateForm();
-                } catch (canvasErr) {
-                    logError("Canvas compression failed, attempting legacy raw file fallback: " + canvasErr.message);
-                    fallbackRead(file);
-                }
+                };
+                img.onerror = function() {
+                    logError("Could not translate streaming package to canvas. Executing fallback.");
+                    legacyFallback(rawDataUrl);
+                };
+                img.src = rawDataUrl;
             };
-            img.onerror = function() {
-                logError("Failed to convert binary file into image object, attempting legacy fallback reader.");
-                fallbackRead(file);
+            reader.onerror = function() {
+                logError("Hardware read error on selected stream. File might be protected by system.");
             };
-            img.src = blobUrl;
+            reader.readAsDataURL(file);
         }
-    });
+    }
 
-    function fallbackRead(file) {
-        const reader = new FileReader();
-        reader.onload = function(event) {
-            currentImgBase64 = event.target.result;
-            preview.src = currentImgBase64;
-            preview.style.display = 'block';
-            uploadLabel.textContent = "🔄 Change Photo";
-            validateForm();
-        };
-        reader.onerror = function() {
-            logError("Both compression pipeline and fallback file reader failed on this image.");
-            uploadLabel.textContent = "❌ Load Error";
-        };
-        reader.readAsDataURL(file);
+    function legacyFallback(dataUrl) {
+        currentImgBase64 = dataUrl;
+        preview.src = currentImgBase64;
+        preview.style.display = 'block';
+        cameraBtn.innerHTML = "<span>📷</span><span>Retake Photo</span>";
+        galleryBtn.innerHTML = "<span>🖼️</span><span>Change Photo</span>";
+        validateForm();
     }
 
     function validateForm() {
@@ -353,10 +398,12 @@
         currentImgBase64 = null;
         preview.style.display = 'none';
         preview.src = '';
-        uploadLabel.textContent = "📷 Snap or Choose Photo";
+        cameraBtn.innerHTML = "<span>📷</span><span>Take Live Photo</span>";
+        galleryBtn.innerHTML = "<span>🖼️</span><span>Upload Gallery</span>";
         descriptionInput.value = '';
         submitBtn.disabled = true;
         cameraInput.value = '';
+        galleryInput.value = '';
         localStorage.removeItem('temp_desc');
         localStorage.removeItem('temp_img');
     }
@@ -399,13 +446,13 @@
         try {
             localStorage.setItem('studioLogs', JSON.stringify(logs));
         } catch (e) {
-            logError("Local storage quota limit reached. Auto-removing oldest studio log to save new proof.");
+            logError("Local storage bounds hit. Auto-discharging legacy logs.");
             if (logs.length > 1) {
                 logs.pop(); // Discard oldest entries
                 try {
                     localStorage.setItem('studioLogs', JSON.stringify(logs));
                 } catch (retryErr) {
-                    logError("Severe LocalStorage failure: " + retryErr.message);
+                    logError("Severe LocalStorage block: " + retryErr.message);
                 }
             }
         }
@@ -427,6 +474,7 @@
                         ${escapeHtml(log.description)}
                     
                 `;
+                // Standard appender fix prevents structural engine breakdown
                 logGrid.appendChild(card);
             });
         } catch (renderErr) {
@@ -439,7 +487,7 @@
     }
 
     window.addEventListener('DOMContentLoaded', () => {
-        // Self-repair logic to wipe any corrupted data structures from previous prototyping attempts
+        // Self-repair wipes out structure if corrupted by legacy prototype builds
         try {
             const rawLogs = localStorage.getItem('studioLogs');
             if (rawLogs) {
@@ -447,25 +495,25 @@
                 if (!Array.isArray(parsed)) throw new Error();
             }
         } catch (repairErr) {
-            console.warn("Wiping corrupted log databases.");
             localStorage.removeItem('studioLogs');
             localStorage.removeItem('temp_img');
             localStorage.removeItem('temp_desc');
         }
 
-        // Restore description in case page was reloaded by camera system usage
+        // Restore description in case system crashed out during camera view loads
         const savedDesc = localStorage.getItem('temp_desc');
         if (savedDesc) {
             descriptionInput.value = savedDesc;
         }
 
-        // Restore image backup if iOS crashed the page memory when opening camera
+        // Restore image backup instantly
         const savedImg = localStorage.getItem('temp_img');
         if (savedImg) {
             currentImgBase64 = savedImg;
             preview.src = currentImgBase64;
             preview.style.display = 'block';
-            uploadLabel.textContent = "🔄 Change Photo";
+            cameraBtn.innerHTML = "<span>📷</span><span>Retake Photo</span>";
+            galleryBtn.innerHTML = "<span>🖼|</span><span>Change Photo</span>";
         }
 
         renderLogs();
