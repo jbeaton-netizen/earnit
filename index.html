@@ -216,7 +216,7 @@
     <div id="uploadSection" class="upload-section">
         <h3 style="font-size: 1.1rem; font-weight: 700;">Submit Studio Progress</h3>
         
-        
+        <!-- Dual trigger inputs (Using native labels for zero-JavaScript safety) -->
         <div class="input-row">
             <label for="camera-input" id="cameraBtn" class="action-select-btn">
                 <span style="font-size: 1.5rem;">📷</span>
@@ -263,6 +263,17 @@
     const debugPanel = document.getElementById('debugPanel');
     const debugText = document.getElementById('debugText');
 
+    // Bulletproof LocalStorage Safe Writer
+    function safeLocalStorageSet(key, value) {
+        try {
+            localStorage.setItem(key, value);
+            return true;
+        } catch (e) {
+            console.warn("Storage write blocked natively (Incognito/Quota Limit). Active operation remains memory-based.");
+            return false;
+        }
+    }
+
     function logError(msg) {
         debugPanel.style.display = 'flex';
         debugText.textContent = msg;
@@ -271,97 +282,98 @@
 
     // Auto-save description on type to survive potential low RAM background reloads
     descriptionInput.addEventListener('input', () => {
-        localStorage.setItem('temp_desc', descriptionInput.value);
+        safeLocalStorageSet('temp_desc', descriptionInput.value);
         validateForm();
     });
 
     cameraInput.addEventListener('change', handleImageSelection);
     galleryInput.addEventListener('change', handleImageSelection);
 
+    // Highly Optimized Memory-Safe Blob & Canvas Compression Pipeline
     function handleImageSelection(e) {
         const file = e.target.files[0];
-        if (file) {
-            cameraBtn.innerHTML = "<span>⚙&#xFE0F;</span><span>Processing...</span>";
-            galleryBtn.innerHTML = "<span>⚙&#xFE0F;</span><span>Processing...</span>";
-            
-            // Progressive File Reader prevents sandbox breaks by reading raw stream first
-            const reader = new FileReader();
-            reader.onload = function(event) {
-                const rawDataUrl = event.target.result;
-                
-                // Compress via off-screen Canvas
-                const img = new Image();
-                img.onload = function() {
-                    try {
-                        const canvas = document.createElement('canvas');
-                        let width = img.width;
-                        let height = img.height;
-                        const MAX_WIDTH = 500; 
-                        const MAX_HEIGHT = 500;
-                        
-                        if (width > height) {
-                            if (width > MAX_WIDTH) {
-                                height *= MAX_WIDTH / width;
-                                width = MAX_WIDTH;
-                            }
-                        } else {
-                            if (height > MAX_HEIGHT) {
-                                width *= MAX_HEIGHT / height;
-                                height = MAX_HEIGHT;
-                            }
-                        }
-                        
-                        canvas.width = width;
-                        canvas.height = height;
-                        const ctx = canvas.getContext('2d');
-                        ctx.drawImage(img, 0, 0, width, height);
-                        
-                        currentImgBase64 = canvas.toDataURL('image/jpeg', 0.55); // High density compression
-                        
-                        // Save backup immediately to bypass low RAM reboots
-                        try {
-                            localStorage.setItem('temp_img', currentImgBase64);
-                        } catch (quotaErr) {
-                            console.warn("Cleared old log due to local storage quota bounds.");
-                            let tempLogs = JSON.parse(localStorage.getItem('studioLogs')) || [];
-                            if (tempLogs.length > 0) {
-                                tempLogs.pop();
-                                localStorage.setItem('studioLogs', JSON.stringify(tempLogs));
-                            }
-                            localStorage.setItem('temp_img', currentImgBase64);
-                        }
+        if (!file) return;
 
-                        preview.src = currentImgBase64;
-                        preview.style.display = 'block';
-                        
-                        cameraBtn.innerHTML = "<span>📷</span><span>Retake Photo</span>";
-                        galleryBtn.innerHTML = "<span>🖼️</span><span>Change Photo</span>";
-                        validateForm();
-                    } catch (canvasErr) {
-                        logError("Canvas compression fell back to legacy layout: " + canvasErr.message);
-                        legacyFallback(rawDataUrl);
+        cameraBtn.innerHTML = "<span>⚙&#xFE0F;</span><span>Processing...</span>";
+        galleryBtn.innerHTML = "<span>⚙&#xFE0F;</span><span>Processing...</span>";
+
+        try {
+            // Memory-safe temporary Object URL (avoids high-res RAM crashing)
+            const objectUrl = URL.createObjectURL(file);
+            const img = new Image();
+            
+            img.onload = function() {
+                try {
+                    const canvas = document.createElement('canvas');
+                    let width = img.width;
+                    let height = img.height;
+                    const MAX_SIZE = 400; // Small, low-footprint scale guarantees zero-crash storage allocation
+                    
+                    if (width > height) {
+                        if (width > MAX_SIZE) {
+                            height *= MAX_SIZE / width;
+                            width = MAX_SIZE;
+                        }
+                    } else {
+                        if (height > MAX_SIZE) {
+                            width *= MAX_SIZE / height;
+                            height = MAX_SIZE;
+                        }
                     }
-                };
-                img.onerror = function() {
-                    logError("Could not translate streaming package to canvas. Executing fallback.");
-                    legacyFallback(rawDataUrl);
-                };
-                img.src = rawDataUrl;
+                    
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+                    
+                    // Low footprint base64 capture (usually under 25KB)
+                    currentImgBase64 = canvas.toDataURL('image/jpeg', 0.5);
+                    
+                    preview.src = currentImgBase64;
+                    preview.style.display = 'block';
+                    
+                    safeLocalStorageSet('temp_img', currentImgBase64);
+                    
+                    cameraBtn.innerHTML = "<span>📷</span><span>Retake Photo</span>";
+                    galleryBtn.innerHTML = "<span>🖼️</span><span>Change Photo</span>";
+                    validateForm();
+                    
+                    // Clean up URL memory instantly
+                    URL.revokeObjectURL(objectUrl);
+                } catch (canvasErr) {
+                    logError("Canvas layout generation error: " + canvasErr.message);
+                    fallbackToFileReader(file);
+                }
             };
-            reader.onerror = function() {
-                logError("Hardware read error on selected stream. File might be protected by system.");
+
+            img.onerror = function() {
+                logError("Failed to decode system camera image package.");
+                fallbackToFileReader(file);
             };
-            reader.readAsDataURL(file);
+
+            img.src = objectUrl;
+        } catch (err) {
+            logError("Object URI parsing blocked by OS security context. Redirecting fallback stream.");
+            fallbackToFileReader(file);
         }
     }
 
-    function legacyFallback(dataUrl) {
-        currentImgBase64 = dataUrl;
-        preview.src = currentImgBase64;
-        preview.style.display = 'block';
-        cameraBtn.innerHTML = "<span>📷</span><span>Retake Photo</span>";
-        galleryBtn.innerHTML = "<span>🖼️</span><span>Change Photo</span>";
-        validateForm();
+    // Direct Stream reader fallback
+    function fallbackToFileReader(file) {
+        const reader = new FileReader();
+        reader.onload = function(event) {
+            currentImgBase64 = event.target.result;
+            preview.src = currentImgBase64;
+            preview.style.display = 'block';
+            safeLocalStorageSet('temp_img', currentImgBase64);
+            cameraBtn.innerHTML = "<span>📷</span><span>Retake Photo</span>";
+            galleryBtn.innerHTML = "<span>🖼️</span><span>Change Photo</span>";
+            validateForm();
+        };
+        reader.onerror = function() {
+            logError("Both memory-safe pipelines failed to decode this image.");
+        };
+        reader.readAsDataURL(file);
     }
 
     function validateForm() {
@@ -411,7 +423,7 @@
         statusMsg.textContent = "Enjoy your 15-minute break window.";
         
         unlockEndTime = Date.now() + (15 * 60 * 1000);
-        localStorage.setItem('unlockEndTime', unlockEndTime);
+        safeLocalStorageSet('unlockEndTime', unlockEndTime);
 
         updateTimerUI();
         timerInterval = setInterval(updateTimerUI, 1000);
@@ -436,28 +448,33 @@
     }
 
     function saveLogToLocalStorage(log) {
-        let logs = JSON.parse(localStorage.getItem('studioLogs')) || [];
+        let logs = [];
+        try {
+            logs = JSON.parse(localStorage.getItem('studioLogs')) || [];
+        } catch (e) {
+            logs = [];
+        }
         logs.unshift(log);
         
-        try {
-            localStorage.setItem('studioLogs', JSON.stringify(logs));
-        } catch (e) {
-            logError("Local storage bounds hit. Auto-discharging legacy logs.");
-            if (logs.length > 1) {
-                logs.pop(); // Discard oldest entries
-                try {
-                    localStorage.setItem('studioLogs', JSON.stringify(logs));
-                } catch (retryErr) {
-                    logError("Severe LocalStorage block: " + retryErr.message);
-                }
-            }
+        // Strictly cap list to latest 10 elements to prevent hitting memory limitations
+        if (logs.length > 10) {
+            logs = logs.slice(0, 10);
         }
-        renderLogs();
+        
+        const success = safeLocalStorageSet('studioLogs', JSON.stringify(logs));
+        if (!success) {
+            // Try saving only the newest 3 items if storage limit remains tight
+            logs = logs.slice(0, 3);
+            safeLocalStorageSet('studioLogs', JSON.stringify(logs));
+        }
+        renderLogs(logs);
     }
 
-    function renderLogs() {
+    function renderLogs(logs) {
         try {
-            let logs = JSON.parse(localStorage.getItem('studioLogs')) || [];
+            if (!logs) {
+                logs = JSON.parse(localStorage.getItem('studioLogs')) || [];
+            }
             logGrid.innerHTML = '';
             
             logs.forEach(log => {
@@ -470,7 +487,6 @@
                         ${escapeHtml(log.description)}
                     
                 `;
-                // Standard appender fix prevents structural engine breakdown
                 logGrid.appendChild(card);
             });
         } catch (renderErr) {
@@ -483,7 +499,7 @@
     }
 
     window.addEventListener('DOMContentLoaded', () => {
-        // Self-repair wipes out structure if corrupted by legacy prototype builds
+        // Safe database repair block
         try {
             const rawLogs = localStorage.getItem('studioLogs');
             if (rawLogs) {
@@ -496,13 +512,13 @@
             localStorage.removeItem('temp_desc');
         }
 
-        // Restore description in case system crashed out during camera view loads
+        // Restore description backups
         const savedDesc = localStorage.getItem('temp_desc');
         if (savedDesc) {
             descriptionInput.value = savedDesc;
         }
 
-        // Restore image backup instantly
+        // Restore image backups
         const savedImg = localStorage.getItem('temp_img');
         if (savedImg) {
             currentImgBase64 = savedImg;
