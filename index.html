@@ -184,7 +184,7 @@
         <label for="camera-input" class="camera-btn" id="uploadLabel">
             📷 Snap or Choose Photo
         </label>
-        <input type="file" id="camera-input" accept="image/*" capture="environment">
+        <input type="file" id="camera-input" name="camera-input" accept="image/*" capture="environment">
         <img id="preview" class="preview-img" alt="Progress preview">
         <textarea id="description" placeholder="What are you working on right now?"></textarea>
         <button id="submitBtn" class="action-btn" disabled>Submit Proof & Unlock</button>
@@ -240,8 +240,8 @@
                         let width = img.width;
                         let height = img.height;
                         
-                        const MAX_WIDTH = 800;
-                        const MAX_HEIGHT = 800;
+                        const MAX_WIDTH = 600; // Small max size prevents Safari from running out of memory
+                        const MAX_HEIGHT = 600;
                         
                         if (width > height) {
                             if (width > MAX_WIDTH) {
@@ -260,13 +260,21 @@
                         const ctx = canvas.getContext('2d');
                         ctx.drawImage(img, 0, 0, width, height);
                         
-                        currentImgBase64 = canvas.toDataURL('image/jpeg', 0.65);
+                        currentImgBase64 = canvas.toDataURL('image/jpeg', 0.60);
+                        
+                        // Immediately save compressed preview to LocalStorage so memory reloads recover gracefully
+                        try {
+                            localStorage.setItem('temp_img', currentImgBase64);
+                        } catch (quotaErr) {
+                            console.warn("Could not auto-save temp image preview:", quotaErr.message);
+                        }
+
                         preview.src = currentImgBase64;
                         preview.style.display = 'block';
                         uploadLabel.textContent = "🔄 Change Photo";
                         validateForm();
                     } catch (canvasErr) {
-                        logError("Canvas compression failed, attempting raw upload fallback: " + canvasErr.message);
+                        logError("Canvas processing failed, using raw upload fallback: " + canvasErr.message);
                         currentImgBase64 = event.target.result;
                         preview.src = currentImgBase64;
                         preview.style.display = 'block';
@@ -322,6 +330,7 @@
         submitBtn.disabled = true;
         cameraInput.value = '';
         localStorage.removeItem('temp_desc');
+        localStorage.removeItem('temp_img');
     }
 
     function startUnlockTimer() {
@@ -359,7 +368,6 @@
         let logs = JSON.parse(localStorage.getItem('studioLogs')) || [];
         logs.unshift(log);
         
-        // Wrap saving in try-catch and pop oldest if memory is full
         try {
             localStorage.setItem('studioLogs', JSON.stringify(logs));
         } catch (e) {
@@ -391,7 +399,7 @@
                         ${escapeHtml(log.description)}
                     
                 `;
-                logGrid.appendChild(card); // FIXED: appendChild instead of .add()
+                logGrid.appendChild(card);
             });
         } catch (renderErr) {
             logError("Render error: " + renderErr.message);
@@ -409,7 +417,17 @@
             descriptionInput.value = savedDesc;
         }
 
+        // Restore image backup if iOS crashed the page memory when opening camera
+        const savedImg = localStorage.getItem('temp_img');
+        if (savedImg) {
+            currentImgBase64 = savedImg;
+            preview.src = currentImgBase64;
+            preview.style.display = 'block';
+            uploadLabel.textContent = "🔄 Change Photo";
+        }
+
         renderLogs();
+        validateForm();
         
         const savedEndTime = localStorage.getItem('unlockEndTime');
         if (savedEndTime && parseInt(savedEndTime) > Date.now()) {
