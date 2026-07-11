@@ -3,11 +3,11 @@
   "short_name": "EarnIt",
   "start_url": "index.html",
   "display": "standalone",
-  "background_color": "#121212",
-  "theme_color": "#00a896",
+  "background_color": "#0f172a",
+  "theme_color": "#0d9488",
   "icons": [
     {
-      "src": "https://placehold.co/512x512/00a896/ffffff?text=E",
+      "src": "https://placehold.co/512x512/0d9488/ffffff?text=E",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
